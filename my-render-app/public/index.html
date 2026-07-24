@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>System Księgowy — Księga Główna</title>
+<style>
+  :root {
+    --primary: #1a73e8;
+    --primary-hover: #1765cc;
+    --bg-main: #f8f9fa;
+    --card-bg: #ffffff;
+    --border-color: #dadce0;
+    --text-color: #202124;
+    --text-muted: #5f6368;
+    --green: #188038;
+    --red: #c5221f;
+    --amber: #e8710a;
+    --cell-h: 32px;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg-main);
+    color: var(--text-color);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* APP HEADER */
+  .app-header {
+    background: var(--card-bg);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    gap: 12px;
+  }
+
+  .app-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .app-logo {
+    width: 28px;
+    height: 28px;
+    background: var(--primary);
+    color: white;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  .app-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  .sync-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    color: var(--text-muted);
+    padding: 5px 10px;
+    border-radius: 12px;
+    background: #f1f3f4;
+    cursor: pointer;
+    white-space: nowrap;
+    user-select: none;
+  }
+  .sync-pill:hover { background: #e8eaed; }
+  .sync-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #9aa0a6;
+    flex-shrink: 0;
+  }
+  .sync-pill.ok .sync-dot { background: var(--green); }
+  .sync-pill.syncing .sync-dot { background: var(--primary); animation: pulse 1s ease-in-out infinite; }
+  .sync-pill.error .sync-dot { background: var(--red); }
+  .sync-pill.offline .sync-dot { background: var(--amber); }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.35;} }
+
+  .toast-pill {
+    font-size: 11px;
+    background: #e6f4ea;
+    color: var(--green);
+    padding: 4px 10px;
+    border-radius: 12px;
+    opacity: 0;
+    transition: opacity .3s ease;
+    white-space: nowrap;
+    font-weight: 500;
+  }
+  .toast-pill.show { opacity: 1; }
+  .toast-pill.err { background: #fce8e6; color: var(--red); }
+
+  /* SYNC SETTINGS PANEL */
+  .sync-panel {
+    position: absolute;
+    top: 52px;
+    right: 16px;
+    width: 340px;
+    max-width: calc(100vw - 32px);
+    background: #fff;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.14);
+    padding: 16px;
+    z-index: 50;
+    display: none;
+  }
+  .sync-panel.open { display: block; }
+  .sync-panel h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; }
+  .sync-panel p { margin: 0 0 10px; font-size: 11.5px; color: var(--text-muted); line-height: 1.5; }
+  .sync-panel input {
+    width: 100%; border: 1px solid var(--border-color); border-radius: 5px;
+    padding: 8px 10px; font-size: 11.5px; font-family: monospace; outline: none; margin-bottom: 8px;
+  }
+  .sync-panel input:focus { border-color: var(--primary); }
+  .sync-panel-row { display: flex; gap: 8px; }
+  .sync-panel button { border: none; border-radius: 5px; padding: 7px 12px; font-size: 12px; cursor: pointer; }
+  .sync-panel button.primary { background: var(--primary); color: #fff; }
+  .sync-panel button.primary:hover { background: var(--primary-hover); }
+  .sync-panel button.ghost { background: #fff; border: 1px solid var(--border-color); color: var(--text-muted); }
+  .sync-panel-status { margin-top: 10px; font-size: 11px; color: var(--text-muted); padding-top: 10px; border-top: 1px solid var(--border-color); }
+  .sync-panel-status .row { display:flex; justify-content:space-between; padding:2px 0; }
+
+  /* TAB NAVIGATION */
+  .tabstrip {
+    display: flex;
+    align-items: center;
+    background: var(--card-bg);
+    border-top: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+    padding: 0 4px;
+    overflow-x: auto;
+    height: 40px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .tabstrip::-webkit-scrollbar { display: none; }
+
+  .sheet-tab {
+    padding: 0 12px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    white-space: nowrap;
+    border-bottom: 3px solid transparent;
+    flex-shrink: 0;
+    transition: all 0.2s;
+  }
+  .sheet-tab:hover { color: var(--primary); background: #f8f9fa; }
+  .sheet-tab.active {
+    color: var(--primary);
+    border-bottom: 3px solid var(--primary);
+    background: #fff;
+  }
+
+  /* MAIN CONTENT AREA */
+  .main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .gridwrap {
+    flex: 1;
+    overflow: auto;
+    background: var(--card-bg);
+    position: relative;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table.gsheet {
+    border-collapse: collapse;
+    table-layout: fixed;
+    width: 100%;
+  }
+
+  table.gsheet th, table.gsheet td {
+    border: 1px solid var(--border-color);
+    height: var(--cell-h);
+    padding: 4px 6px;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .col-header-row th {
+    background: #f1f3f4;
+    color: var(--text-muted);
+    font-weight: 600;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 3;
+  }
+
+  .corner-cell {
+    background: #f1f3f4;
+    position: sticky;
+    left: 0; top: 0;
+    z-index: 4;
+    width: 24px !important; min-width: 24px !important; max-width: 24px !important;
+  }
+
+  .row-num {
+    background: #f1f3f4;
+    color: var(--text-muted);
+    text-align: center;
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    width: 24px !important; min-width: 24px !important; max-width: 24px !important;
+    padding: 0 !important;
+    user-select: none;
+    font-size: 10px;
+    font-weight: 500;
+  }
+
+  td.cell {
+    background: #fff;
+    color: var(--text-color);
+    cursor: pointer;
+    position: relative;
+  }
+  td.cell:focus {
+    outline: 2px solid var(--primary);
+    outline-offset: -2px;
+    z-index: 1;
+  }
+  td.cell.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.cell.hdr { font-weight: 600; background: #f8f9fa; }
+  td.cell.readonly { color: var(--text-muted); background: #fafbfc; }
+  td.cell.added { background: #e6f4ea; transition: background 1.4s; }
+  td.cell.remote-updated { background: #e8f0fe; transition: background 1.8s; }
+  td.cell.pushing::after {
+    content: ''; position: absolute; top: 3px; right: 3px;
+    width: 5px; height: 5px; border-radius: 50%; background: var(--primary);
+  }
+  td.cell.push-failed::after {
+    content: ''; position: absolute; top: 3px; right: 3px;
+    width: 5px; height: 5px; border-radius: 50%; background: var(--red);
+  }
+
+  /* SEARCH PANEL STYLE */
+  .search-panel { padding: 16px; max-width: 600px; margin: 0 auto; width: 100%; }
+  .search-panel label {
+    display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 6px;
+    text-transform: uppercase; letter-spacing: .04em; font-weight: 600;
+  }
+  .search-row { display: flex; gap: 8px; margin-bottom: 16px; }
+  .search-row input {
+    flex: 1; border: 1px solid var(--border-color); border-radius: 6px;
+    padding: 10px 12px; font-size: 14px; font-family: monospace; outline: none; background: #fff;
+  }
+  .search-row input:focus { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+  .search-row button {
+    background: var(--primary); color: #fff; border: none; border-radius: 6px;
+    padding: 0 16px; font-size: 13px; font-weight: 500; cursor: pointer;
+  }
+  .search-row button:hover { background: var(--primary-hover); }
+  .search-result { border: 1px solid var(--border-color); border-radius: 6px; overflow: hidden; background: #fff; }
+  .search-result .row { display: flex; border-bottom: 1px solid var(--border-color); font-size: 13px; }
+  .search-result .row:last-child { border-bottom: none; }
+  .search-result .row .k {
+    width: 140px; flex-shrink: 0; padding: 9px 12px; color: var(--text-muted);
+    background: #fafbfc; border-right: 1px solid var(--border-color); font-weight: 500;
+  }
+  .search-result .row .v { padding: 9px 12px; color: var(--text-color); word-break: break-word; flex: 1; }
+  .search-status { font-size: 13px; color: var(--text-muted); padding: 10px 0; }
+  .search-status.error { color: var(--red); }
+  .bank-list { max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 12px; }
+  .bank-list div { padding: 4px 0; border-bottom: 1px solid var(--border-color); }
+  .bank-list div:last-child { border-bottom: none; }
+
+  .load-state {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 10px; height: 100%; padding: 40px 20px; text-align: center;
+    color: var(--text-muted); font-size: 13px;
+  }
+  .load-state p { margin: 0; max-width: 420px; line-height: 1.5; }
+  .load-state.error p strong { color: var(--red); }
+  .load-state button {
+    margin-top: 6px; background: var(--primary); color: #fff; border: none;
+    border-radius: 6px; padding: 8px 16px; font-size: 12.5px; cursor: pointer;
+  }
+  .load-state button:hover { background: var(--primary-hover); }
+  .load-spinner {
+    width: 26px; height: 26px; border: 3px solid #e0e0e0;
+    border-top-color: var(--primary); border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 768px) {
+    .app-header { padding: 8px 12px; }
+    .app-title { font-size: 15px; }
+    .search-panel { padding: 12px; }
+    .search-row { flex-direction: column; }
+    .search-row input, .search-row button { height: 40px; width: 100%; }
+    .search-result .row { flex-direction: column; }
+    .search-result .row .k {
+      width: 100%; background: #f1f3f4; border-right: none;
+      border-bottom: 1px solid var(--border-color); padding: 6px 10px; font-size: 11px;
+    }
+    .search-result .row .v { padding: 8px 10px; font-size: 12px; }
+    .sheet-tab { padding: 0 10px; font-size: 12px; }
+    .sync-panel { right: 8px; left: 8px; width: auto; }
+  }
+</style>
+</head>
+<body>
+
+  <header class="app-header">
+    <div class="app-brand">
+      <div class="app-logo">KG</div>
+      <h1 class="app-title">System Księgowy 2026</h1>
+    </div>
+    <div class="header-right">
+      <span class="toast-pill" id="toastPill"></span>
+      <div class="sync-pill" id="syncPill"><span class="sync-dot"></span><span id="syncLabel">Łączenie…</span></div>
+    </div>
+  </header>
+
+  <div class="sync-panel" id="syncPanel">
+    <h3>Synchronizacja z Arkuszem Google</h3>
+    <p>Adres wdrożonego Web Appa (Apps Script). Zapisy w tej aplikacji trafiają do Arkusza natychmiast; zmiany zrobione w Arkuszu pojawią się tutaj przy kolejnym odświeżeniu (~8 s).</p>
+    <input type="text" id="webAppUrlInput" placeholder="https://script.google.com/macros/s/…/exec">
+    <div class="sync-panel-row">
+      <button class="primary" id="syncSaveBtn">Zapisz i połącz</button>
+      <button class="ghost" id="syncNowBtn">Odśwież teraz</button>
+    </div>
+    <div class="sync-panel-status" id="syncPanelStatus"></div>
+  </div>
+
+  <nav class="tabstrip" id="tabStrip"></nav>
+
+  <main class="main-content">
+    <div class="gridwrap" id="gridWrap"></div>
+  </main>
+
+<script>
+/* CLOUD SYNC CONFIGURATION */
+const DEFAULT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyILoBUwmbiaSV0VKVP2-SEtXbhOZi4iIjUG-AQJaUL8Z4JlHUPoG6FEQhC_UWm2EY0/exec';
+const WEBAPP_STORAGE_KEY = 'ksiega:webAppUrl';
+
+function getWebAppUrl(){
+  try{ return localStorage.getItem(WEBAPP_STORAGE_KEY) || DEFAULT_WEB_APP_URL; }catch(e){ return DEFAULT_WEB_APP_URL; }
+}
+function setWebAppUrl(url){
+  try{ localStorage.setItem(WEBAPP_STORAGE_KEY, url); }catch(e){ /* ignore */ }
+}
+let WEB_APP_URL = getWebAppUrl();
+
+const SHEET_NAMES = {
+  kpir: 'KPiR',
+  masterlog: 'MasterLog',
+  vat: 'Rozliczenie VAT',
+  kosztowe: 'Faktury_kosztowe',
+  sprzedazowe: 'Faktury_sprzedażowe',
+};
+
+const SHEETS = [
+  { key:'kpir', tab:'KPiR', widths:[200,150,140,120,170,120,150,130,120], data: [], extraBlank:10 },
+  { key:'masterlog', tab:'MasterLog', widths:[90,80,150,100,100,120,190,220,150,110,140,110], data: [], extraBlank:14 },
+  { key:'vat', tab:'Rozliczenie VAT', widths:[180,160,120,120,120], data: [], extraBlank:20 },
+  { key:'search', tab:'Wyszukiwarka NIP', special:'search' },
+  { key:'kosztowe', tab:'Faktury kosztowe', widths:[110,180,120], data: [], extraBlank:10 },
+  { key:'sprzedazowe', tab:'Faktury sprzedażowe', widths:[110,180,120], data: [], extraBlank:10 },
+];
+
+const byKey = {};
+SHEETS.forEach(s=> byKey[s.key]=s);
+let activeKey = 'masterlog';
+let hasLoadedOnce = false;
+let initialLoadFailed = false;
+
+function colLetter(n){
+  let s=''; n++;
+  while(n>0){
+    const m=(n-1)%26;
+    s = String.fromCharCode(65+m)+s;
+    n = Math.floor((n-1)/26);
+  }
+  return s;
+}
+
+function padRows(sheet, baseLength){
+  const width = sheet.widths ? sheet.widths.length : 0;
+  if (!width) return;
+  const target = baseLength + (sheet.extraBlank || 5);
+  while(sheet.data.length < target){
+    sheet.data.push(new Array(width).fill(''));
+  }
+}
+
+function escapeHtml(s){
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function showToast(msg, isErr){
+  const el = document.getElementById('toastPill');
+  el.textContent = msg;
+  el.classList.toggle('err', !!isErr);
+  el.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(()=> el.classList.remove('show'), 3000);
+}
+
+/* CLOUD API IO */
+async function cloudFetchSheet(name){
+  const url = `${WEB_APP_URL}?action=sheet&name=${encodeURIComponent(name)}`;
+  const resp = await fetch(url);
+  if(!resp.ok) throw new Error('HTTP '+resp.status);
+  return await resp.json();
+}
+
+/* NEW DATABASE API CHECK FUNCTION WITH FALLBACK */
+async function cloudFetchNip(nip){
+  // 1. Try querying your Render Postgres backend endpoint first
+  try {
+    const dbResp = await fetch(`/api/check-nip/${encodeURIComponent(nip)}`);
+    if (dbResp.ok) {
+      const dbJson = await dbResp.json();
+      if (dbJson.found && dbJson.data) {
+        // Return standard structure mapped from your Postgres database
+        return {
+          result: {
+            subject: {
+              name: dbJson.data.name || dbJson.data.company_name,
+              workingAddress: dbJson.data.address,
+              statusVat: dbJson.data.vat_status || 'Czynny',
+              regon: dbJson.data.regon,
+              krs: dbJson.data.krs,
+              accountNumbers: dbJson.data.bank_accounts ? [].concat(dbJson.data.bank_accounts) : []
+            }
+          }
+        };
+      }
+    }
+  } catch (err) {
+    console.warn("Database lookup failed or route unavailable. Falling back to MF API...", err);
+  }
+
+  // 2. Fallback to Google Apps Script proxy (Ministerstwo Finansów Biała Lista)
+  const url = `${WEB_APP_URL}?action=nip&nip=${encodeURIComponent(nip)}`;
+  const resp = await fetch(url);
+  if(!resp.ok) throw new Error('HTTP '+resp.status);
+  return await resp.json();
+}
+
+async function cloudWriteCell(sheetName, row1, col1, value){
+  const resp = await fetch(WEB_APP_URL, {
+    method:'POST',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body: JSON.stringify({sheet:sheetName, row:row1, column:col1, value})
+  });
+  if(!resp.ok) throw new Error('HTTP '+resp.status);
+  return await resp.json().catch(()=>({}));
+}
+
+function cellHasFocus(key, row, col){
+  const el = document.activeElement;
+  return el && el.classList && el.classList.contains('cell')
+    && activeKey===key && +el.dataset.row===row && +el.dataset.col===col;
+}
+
+async function loadSheetFromCloud(key){
+  const name = SHEET_NAMES[key];
+  if(!name) return;
+  const rows = await cloudFetchSheet(name);
+  if(!Array.isArray(rows)) return;
+  
+  const sheet = byKey[key];
+  const width = sheet.widths.length;
+  const changedCells = [];
+
+  for(let r=0; r<Math.max(rows.length, sheet.data.length); r++){
+    if(!sheet.data[r]) sheet.data[r] = new Array(width).fill('');
+    const incomingRow = rows[r] || [];
+    for(let c=0; c<width; c++){
+      if(cellHasFocus(key, r, c)) continue;
+      const newVal = incomingRow[c] !== undefined && incomingRow[c] !== null ? String(incomingRow[c]) : '';
+      if(sheet.data[r][c] !== newVal){
+        sheet.data[r][c] = newVal;
+        changedCells.push([r,c]);
+      }
+    }
+  }
+  padRows(sheet, rows.length);
+  return changedCells;
+}
+
+let isSyncing = false;
+async function syncAllFromCloud(showSpinner){
+  if(isSyncing || !WEB_APP_URL) return;
+  isSyncing = true;
+  if(showSpinner) setSyncStatus('syncing', 'Synchronizacja…');
+  try{
+    const keys = Object.keys(SHEET_NAMES);
+    let anyChanged = false;
+    for(const key of keys){
+      const changed = await loadSheetFromCloud(key);
+      if(changed && changed.length){
+        anyChanged = true;
+        if(key===activeKey) flagRemoteChanges(changed);
+      }
+    }
+    setSyncStatus('ok', 'Połączono · ' + new Date().toLocaleTimeString('pl-PL'));
+    initialLoadFailed = false;
+    const wasFirstLoad = !hasLoadedOnce;
+    hasLoadedOnce = true;
+    if((wasFirstLoad || anyChanged) && activeKey!=='search') renderGrid();
+  }catch(err){
+    setSyncStatus('error', 'Błąd połączenia');
+    if(!hasLoadedOnce){ initialLoadFailed = true; renderGrid(); }
+  }finally{
+    isSyncing = false;
+  }
+}
+
+function flagRemoteChanges(cells){
+  requestAnimationFrame(()=>{
+    cells.forEach(([r,c])=>{
+      const td = document.querySelector(`#gridWrap td.cell[data-row="${r}"][data-col="${c}"]`);
+      if(td){
+        td.classList.add('remote-updated');
+        setTimeout(()=> td.classList.remove('remote-updated'), 1800);
+      }
+    });
+  });
+}
+
+function setSyncStatus(state, label){
+  const pill = document.getElementById('syncPill');
+  pill.className = 'sync-pill ' + state;
+  document.getElementById('syncLabel').textContent = label;
+  const statusBox = document.getElementById('syncPanelStatus');
+  if(statusBox){
+    statusBox.innerHTML = `
+      <div class="row"><span>Status</span><span>${escapeHtml(label)}</span></div>
+      <div class="row"><span>Adres URL</span><span>${WEB_APP_URL ? '…' + escapeHtml(WEB_APP_URL.slice(-14)) : 'Nieustawiony'}</span></div>`;
+  }
+}
+
+async function pushCell(key, row, col, displayValue){
+  const name = SHEET_NAMES[key];
+  if(!name) return;
+  const td = document.querySelector(`#gridWrap td.cell[data-row="${row}"][data-col="${col}"]`);
+  if(td){ td.classList.remove('push-failed'); td.classList.add('pushing'); }
+  try{
+    await cloudWriteCell(name, row+1, col+1, displayValue);
+    if(td){ td.classList.remove('pushing'); }
+    setTimeout(()=> syncAllFromCloud(false), 800);
+  }catch(err){
+    if(td){ td.classList.remove('pushing'); td.classList.add('push-failed'); td.title='Nie udało się zapisać'; }
+    showToast('Błąd zapisu do Arkusza Google.', true);
+  }
+}
+
+/* RENDER GRID */
+function renderGrid(){
+  const wrap = document.getElementById('gridWrap');
+  const sheet = byKey[activeKey];
+
+  if(sheet.special==='search'){
+    wrap.innerHTML = buildSearchPanelHTML();
+    initSearchPanel();
+    return;
+  }
+
+  if(!hasLoadedOnce){
+    wrap.innerHTML = initialLoadFailed ? buildLoadErrorHTML() : buildLoadingHTML();
+    if(initialLoadFailed){
+      const retryBtn = document.getElementById('retryLoadBtn');
+      if(retryBtn) retryBtn.addEventListener('click', ()=> syncAllFromCloud(true));
+    }
+    return;
+  }
+
+  const cols = sheet.widths.length;
+  let html = '<table class="gsheet"><thead><tr class="col-header-row"><th class="corner-cell"></th>';
+  for(let c=0;c<cols;c++){
+    html += `<th style="width:${sheet.widths[c]}px;">${colLetter(c)}</th>`;
+  }
+  html += '</tr></thead><tbody>';
+
+  sheet.data.forEach((row,r)=>{
+    html += `<tr><th class="row-num">${r+1}</th>`;
+    for(let c=0;c<cols;c++){
+      const val = row[c] ?? '';
+      const isHeaderRow = (r===0);
+      const cls = ['cell'];
+      if(isHeaderRow) cls.push('hdr');
+      html += `<td class="${cls.join(' ')}" contenteditable="${isHeaderRow?'false':'true'}" spellcheck="false"
+                   data-row="${r}" data-col="${c}">${escapeHtml(val)}</td>`;
+    }
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+
+  wrap.querySelectorAll('td.cell').forEach(td=>{
+    td.addEventListener('blur', onCellBlur);
+    td.addEventListener('keydown', onCellKeydown);
+  });
+}
+
+function buildLoadingHTML(){
+  return `<div class="load-state"><div class="load-spinner"></div><p>Pobieranie danych z Arkusza Google…</p></div>`;
+}
+function buildLoadErrorHTML(){
+  return `
+    <div class="load-state error">
+      <p><strong>Nie udało się pobrać danych z Arkusza Google.</strong></p>
+      <p>Wprowadź poprawny Web App URL w panelu synchronizacji.</p>
+      <button id="retryLoadBtn">Spróbuj ponownie</button>
+    </div>`;
+}
+
+function onCellKeydown(e){
+  if(e.key==='Enter'){
+    e.preventDefault();
+    e.target.blur();
+    const sheet = byKey[activeKey];
+    const nextRow = Math.min(+e.target.dataset.row+1, sheet.data.length-1);
+    focusCell(nextRow, +e.target.dataset.col);
+  } else if(e.key==='Tab'){
+    e.preventDefault();
+    e.target.blur();
+    const sheet = byKey[activeKey];
+    const nextCol = Math.min(+e.target.dataset.col+1, sheet.widths.length-1);
+    focusCell(+e.target.dataset.row, nextCol);
+  }
+}
+
+function focusCell(row,col){
+  const td = document.querySelector(`#gridWrap td.cell[data-row="${row}"][data-col="${col}"]`);
+  if(td){ td.focus(); }
+}
+
+function onCellBlur(e){
+  const td = e.target;
+  const row = +td.dataset.row, col = +td.dataset.col;
+  const sheet = byKey[activeKey];
+  const newVal = td.textContent.trim();
+  const oldVal = sheet.data[row][col];
+  if(newVal === oldVal) return;
+  sheet.data[row][col] = newVal;
+  pushCell(activeKey, row, col, newVal);
+}
+
+/* SEARCH PANEL */
+function buildSearchPanelHTML(){
+  return `
+    <div class="search-panel">
+      <label>Wyszukaj NIP w Bazie Danych / Białej Liście</label>
+      <div class="search-row">
+        <input type="text" id="nipInput" placeholder="np. 5252674798" value="">
+        <button id="nipSearchBtn">Szukaj</button>
+      </div>
+      <div id="searchResults"></div>
+    </div>`;
+}
+
+function initSearchPanel(){
+  const btn = document.getElementById('nipSearchBtn');
+  const input = document.getElementById('nipInput');
+  if(btn && input){
+    btn.addEventListener('click', ()=> runNipSearch(input.value));
+    input.addEventListener('keydown', e=>{ if(e.key==='Enter') runNipSearch(input.value); });
+  }
+}
+
+async function runNipSearch(rawNip){
+  const results = document.getElementById('searchResults');
+  const nip = (rawNip||'').replace(/[\s-]/g,'');
+  if(nip===''){ results.innerHTML=''; return; }
+  if(nip.length!==10 || isNaN(nip)){
+    results.innerHTML = `<p class="search-status error">Błąd: Proszę wpisać poprawny 10-cyfrowy NIP.</p>`;
+    return;
+  }
+  results.innerHTML = `<p class="search-status">Wyszukiwanie NIP w bazie danych…</p>`;
+  try{
+    const json = await cloudFetchNip(nip);
+    if(json && json.error){
+      results.innerHTML = `<p class="search-status error">${escapeHtml(json.message || 'Błąd wyszukiwania.')}</p>`;
+      return;
+    }
+    if(json.result && json.result.subject){
+      const s = json.result.subject;
+      const accounts = (s.accountNumbers||[]);
+      results.innerHTML = `
+        <div class="search-result">
+          <div class="row"><div class="k">Nazwa Firmy:</div><div class="v">${escapeHtml(s.name || 'Brak danych')}</div></div>
+          <div class="row"><div class="k">Adres:</div><div class="v">${escapeHtml(s.workingAddress || s.residenceAddress || 'Brak danych')}</div></div>
+          <div class="row"><div class="k">Status VAT:</div><div class="v">${escapeHtml(s.statusVat || 'Brak danych')}</div></div>
+          <div class="row"><div class="k">REGON:</div><div class="v">${escapeHtml(s.regon || 'Brak danych')}</div></div>
+          <div class="row"><div class="k">KRS:</div><div class="v">${escapeHtml(s.krs || 'Brak danych')}</div></div>
+          <div class="row"><div class="k">Zgłoszone konta:</div><div class="v">
+            ${accounts.length ? `<div class="bank-list">${accounts.map(a=>`<div>${escapeHtml(a)}</div>`).join('')}</div>` : 'Brak kont na liście'}
+          </div></div>
+        </div>`;
+    } else {
+      results.innerHTML = `<p class="search-status error">${escapeHtml((json && json.message) ? 'Odpowiedź: '+json.message : 'Nie znaleziono podmiotu o podanym NIP.')}</p>`;
+    }
+  }catch(err){
+    results.innerHTML = `<p class="search-status error">Błąd połączenia podczas wyszukiwania NIP.</p>`;
+  }
+}
+
+/* TAB STRIP */
+function renderTabs(){
+  const strip = document.getElementById('tabStrip');
+  strip.innerHTML = SHEETS.map(s=>`<div class="sheet-tab ${s.key===activeKey?'active':''}" data-key="${s.key}">${escapeHtml(s.tab)}</div>`).join('');
+  strip.querySelectorAll('.sheet-tab').forEach(t=>{
+    t.addEventListener('click', ()=>{
+      activeKey = t.dataset.key;
+      renderTabs();
+      renderGrid();
+    });
+  });
+}
+
+/* SETTINGS & INIT */
+function initSyncUI(){
+  const pill = document.getElementById('syncPill');
+  const panel = document.getElementById('syncPanel');
+  const input = document.getElementById('webAppUrlInput');
+  input.value = WEB_APP_URL;
+
+  pill.addEventListener('click', ()=> panel.classList.toggle('open'));
+  document.addEventListener('click', e=>{
+    if(!panel.contains(e.target) && !pill.contains(e.target)) panel.classList.remove('open');
+  });
+  document.getElementById('syncSaveBtn').addEventListener('click', ()=>{
+    const val = input.value.trim();
+    if(!val){ showToast('Podaj adres URL Web Appa.', true); return; }
+    WEB_APP_URL = val;
+    setWebAppUrl(val);
+    showToast('Zapisano adres. Łączenie…');
+    syncAllFromCloud(true);
+  });
+  document.getElementById('syncNowBtn').addEventListener('click', ()=> syncAllFromCloud(true));
+}
+
+renderTabs();
+renderGrid();
+initSyncUI();
+if(WEB_APP_URL) syncAllFromCloud(true);
+setInterval(()=> syncAllFromCloud(false), 8000);
+</script>
+</body>
+</html>
